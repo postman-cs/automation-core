@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run verify:package
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Stage release artifact
+        run: |
+          set -euo pipefail
+          mkdir release-stage
+          npm pack --ignore-scripts --pack-destination release-stage
+          mv release-stage/*.tgz release-stage/release.tgz
+          node -e 'const fs=require("fs");const p=require("./package.json");fs.writeFileSync("release-stage/release-manifest.json",JSON.stringify({package_name:p.name,package_version:p.version,tag:process.env.GITHUB_REF_NAME,commit:process.env.GITHUB_SHA},null,2))'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release-stage/release.tgz
+            release-stage/release-manifest.json
+          if-no-files-found: error
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      published: ${{ steps.npm-publish.outputs.published }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-artifacts
+      - name: Verify staged tarball identity
+        run: |
+          set -euo pipefail
+          PACKAGE_JSON="$(tar -xOf release-artifacts/release.tgz package/package.json)"
+          NAME="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).name)' "$PACKAGE_JSON")"
+          VERSION="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).version)' "$PACKAGE_JSON")"
+          [ "$NAME" = '@postman/automation-core' ]
+          [ "$VERSION" = "${GITHUB_REF_NAME#v}" ]
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          generate_release_notes: true
+          files: |
+            release-artifacts/release.tgz
+            release-artifacts/release-manifest.json
+      - name: Publish or verify npm package
+        id: npm-publish
+        continue-on-error: true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"; fi
+          PACKAGE_NAME='@postman/automation-core'
+          PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          LOCAL_INTEGRITY="$(node -e "const {createHash}=require('node:crypto');const {readFileSync}=require('node:fs');process.stdout.write('sha512-'+createHash('sha512').update(readFileSync('release-artifacts/release.tgz')).digest('base64'))")"
+          if REMOTE_INTEGRITY="$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity 2>/dev/null)"; then
+            [ "$REMOTE_INTEGRITY" = "$LOCAL_INTEGRITY" ] || { echo '::error::Published npm integrity differs from staged tarball'; exit 1; }
+            echo 'published=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          npm publish ./release-artifacts/release.tgz --provenance --access public
+          echo 'published=true' >> "$GITHUB_OUTPUT"
+      - name: Verify published npm package integrity
+        if: steps.npm-publish.outputs.published == 'true'
+        run: |
+          set -euo pipefail
+          EXPECTED="$(node -e "const {createHash}=require('node:crypto');const {readFileSync}=require('node:fs');process.stdout.write('sha512-'+createHash('sha512').update(readFileSync('release-artifacts/release.tgz')).digest('base64'))")"
+          for attempt in 1 2 3 4 5; do
+            ACTUAL="$(npm view "@postman/automation-core@${GITHUB_REF_NAME#v}" dist.integrity 2>/dev/null || true)"
+            [ "$ACTUAL" = "$EXPECTED" ] && exit 0
+            sleep "$attempt"
+          done
+          echo '::error::Published npm integrity differs from staged tarball'
+          exit 1
+      - name: Warn npm backfill is needed
+        if: steps.npm-publish.outputs.published != 'true'
+        run: |
+          echo '::warning::npm publish skipped or failed; GitHub Release remains authoritative. Run backfill-npm.yml after npm access is available.'
+          echo 'npm publication was not completed; use backfill-npm.yml to publish this immutable release.' >> "$GITHUB_STEP_SUMMARY"
