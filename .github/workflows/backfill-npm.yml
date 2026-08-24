@@ -1,0 +1,48 @@
+name: Backfill npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: Ordered immutable tags, oldest first (space or newline separated)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Backfill immutable release tarballs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"; fi
+          for TAG in $TAGS; do
+            case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "invalid immutable tag: $TAG"; exit 1 ;; esac
+            mkdir "$TAG"
+            gh release download "$TAG" --pattern release.tgz --dir "$TAG"
+            PACKAGE_JSON="$(tar -xOf "$TAG/release.tgz" package/package.json)"
+            NAME="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).name)' "$PACKAGE_JSON")"
+            VERSION="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).version)' "$PACKAGE_JSON")"
+            [ "$NAME" = '@postman/automation-core' ]
+            [ "$VERSION" = "${TAG#v}" ]
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "::notice::$NAME@$VERSION already exists; skipping."
+            else
+              npm publish "$TAG/release.tgz" --provenance --access public --tag backfill
+            fi
+          done
+          HIGHEST="$(npm view @postman/automation-core versions --json | node -e 'let text="";process.stdin.on("data",d=>text+=d).on("end",()=>{const v=JSON.parse(text);const a=(Array.isArray(v)?v:[v]).filter(x=>/^\d+\.\d+\.\d+$/.test(x)).sort((x,y)=>x.split(".").map(Number).reduce((r,n,i)=>r||n-y.split(".")[i],0));process.stdout.write(a.at(-1)||"")})')"
+          [ -n "$HIGHEST" ]
+          npm dist-tag add "@postman/automation-core@$HIGHEST" latest
