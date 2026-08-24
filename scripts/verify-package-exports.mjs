@@ -92,17 +92,17 @@ const routeManifestTypeExports = [
   'ValidateRouteManifestOptions'
 ];
 
-const rootExports = await import('@postman-cse/automation-core');
+const rootExports = await import('@postman/automation-core');
 for (const name of [...resolverRuntimeExports, ...httpRuntimeExports]) {
   assert.ok(name in rootExports, `dist/index.js must export ${name}`);
 }
 
-const cassetteExports = await import('@postman-cse/automation-core/cassette');
+const cassetteExports = await import('@postman/automation-core/cassette');
 for (const name of cassetteRuntimeExports) {
   assert.ok(name in cassetteExports, `dist/cassette.js must export ${name}`);
 }
 
-const routeManifestExports = await import('@postman-cse/automation-core/route-manifest');
+const routeManifestExports = await import('@postman/automation-core/route-manifest');
 for (const name of routeManifestRuntimeExports) {
   assert.ok(name in routeManifestExports, `dist/route-manifest.js must export ${name}`);
 }
