@@ -1,6 +1,6 @@
-# @postman/automation-core
+# @postman-cs/automation-core
 
-Shared runtime foundations for Postman Enterprise Automation Suite, published as `@postman/automation-core`. It owns suite's HTTP error taxonomy, retry predicate, access-token gateway core, cassette transport, logging, context detection, secrets-resolver helpers, and telemetry. Actions consume package through npm and inline it into self-contained bundles. This is an ESM npm library, not GitHub Action.
+Shared runtime foundations for Postman Enterprise Automation Suite, published as `@postman-cs/automation-core`. It owns suite's HTTP error taxonomy, retry predicate, access-token gateway core, cassette transport, logging, context detection, secrets-resolver helpers, and telemetry. Actions consume package through npm and inline it into self-contained bundles. This is an ESM npm library, not GitHub Action.
 
 ## Structure
 
@@ -54,4 +54,4 @@ block even when another fails.
 
 This is library: `build` is compile check and its `dist/` is gitignored, so there is no dist-drift gate and no commit-message gate.
 
-See workspace `../docs/CI.md` for shared rationale.
+See workspace `../../docs/CI.md` for shared rationale.

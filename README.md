@@ -1,4 +1,4 @@
-# @postman/automation-core
+# @postman-cs/automation-core
 
 Shared runtime foundations for the Postman Enterprise Automation Suite. The
 package owns the suite's HTTP error taxonomy, retry policy, access-token gateway
@@ -10,8 +10,8 @@ inlines it into the action's self-contained `dist/`.
 
 | Module | Surface |
 | --- | --- |
-| `@postman/automation-core` | HTTP errors, retry helpers/predicates, gateway client, logging, context, secrets resolver, telemetry |
-| `@postman/automation-core/cassette` | dev/test-only fail-closed record/replay transport with query/body matching and response-header replay |
+| `@postman-cs/automation-core` | HTTP errors, retry helpers/predicates, gateway client, logging, context, secrets resolver, telemetry |
+| `@postman-cs/automation-core/cassette` | dev/test-only fail-closed record/replay transport with query/body matching and response-header replay |
 
 ## What it sends
 
@@ -42,7 +42,7 @@ a sender's schema version predates are defaulted to `unknown` (hashes to empty).
 ## Usage
 
 ```ts
-import { createTelemetryContext } from '@postman/automation-core';
+import { createTelemetryContext } from '@postman-cs/automation-core';
 
 const telemetry = createTelemetryContext({ action: 'postman-bootstrap-action' });
 telemetry.setTeamId(teamId);
@@ -63,7 +63,7 @@ import {
   HttpError,
   isRetryableGatewayFailure,
   retry
-} from '@postman/automation-core';
+} from '@postman-cs/automation-core';
 ```
 
 Safe reads use the shared superset predicate: statusless transport failures,
@@ -81,7 +81,7 @@ import {
   createEmptyCassette,
   createRecordingFetch,
   createReplayFetch
-} from '@postman/automation-core/cassette';
+} from '@postman-cs/automation-core/cassette';
 ```
 
 Cassette v2 keys proxy and direct routes by method/path, canonical query, and a
