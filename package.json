@@ -1,6 +1,6 @@
 {
   "name": "@postman-cs/automation-core",
-  "version": "1.7.0",
+  "version": "1.8.1",
   "description": "Shared runtime core for postman-actions: HTTP transport foundations, structured logging, context detection, and telemetry.",
   "type": "module",
   "main": "dist/index.js",
