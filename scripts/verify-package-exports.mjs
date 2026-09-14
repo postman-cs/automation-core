@@ -145,7 +145,12 @@ const packOutput = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore
   cwd: packageRoot,
   encoding: 'utf8'
 });
-const [pack] = JSON.parse(packOutput);
+const parsedPackOutput = JSON.parse(packOutput);
+// npm 11 and earlier print an array of packed manifests; npm 12 prints an
+// object keyed by package name. Accept both so this proof runs on either.
+const pack = Array.isArray(parsedPackOutput)
+  ? parsedPackOutput[0]
+  : parsedPackOutput[Object.keys(parsedPackOutput)[0]];
 const packedFiles = new Set(pack.files.map(({ path }) => path));
 for (const path of [
   'dist/secrets-resolver.js',

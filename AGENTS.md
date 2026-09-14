@@ -7,8 +7,9 @@ Shared runtime foundations for Postman Enterprise Automation Suite, published as
 ```
 src/
   index.ts                 # Root public exports
-  http/                    # HttpError, retry policy, access-token gateway core
+  http/                    # HttpError, retry policy, access-token gateway core, error injection
   cassette.ts              # Dev/test record/replay subpath export
+  route-manifest.ts        # Fail-closed static route extraction + manifest validation (subpath export)
   telemetry.ts             # Fire-and-forget completion-event client
   logger.ts                # Structured redaction-safe logging
   ci-context.ts            # CI-system detection
@@ -32,13 +33,13 @@ npm run verify:package # build first; verifies root/cassette exports + npm pack
 
 ## Wire Contract
 
-Emits one `completion` event per action run, after `team_id` resolves. `schema_version` is `3`. Fields: `action`, `action_version`, `outcome`, `ts`, `team_id` (clear), `ci_provider`, `runner_kind`, `run_id`, `repo_id` (`sha256`), schema-2 additions `git_provider`, `org_id` (`sha256(owner)`), and `account_type` (service/user/unknown), plus schema-3 additions `event_trigger`, `runner_os`, and `ref_kind` (coarsened to default-branch/branch/tag). No secrets, spec content, clear repo/org names, or raw ref names. Opt out with `POSTMAN_ACTIONS_TELEMETRY=off` or `DO_NOT_TRACK`.
+Emits one `completion` event per action run, after `team_id` resolves, at `schema_version` 3. The full field table lives in `README.md` ("What it sends"); don't duplicate it here. No secrets, spec content, clear repo/org names, or raw ref names. Opt out with `POSTMAN_ACTIONS_TELEMETRY=off` or `DO_NOT_TRACK`.
 
 Collector is the `postman-automation-events-worker` Worker (`events.pm-cse.dev`), which accepts `schema_version` 1, 2, and 3, defaulting fields sender's version predates to `unknown`.
 
 ## Gotchas
 
-- Builds with `tsc` to emit clean ESM library (no bundling); consuming action's esbuild does inlining, and `--define:__ACTION_VERSION__` in action applies across inlined code so `action_version` resolves automatically.
+- Builds with `tsc` to emit clean ESM library (no bundling); consuming action's esbuild does inlining. Each action passes its own version explicitly as the `actionVersion` option; when omitted the core resolves `GITHUB_ACTION_REF`, then the `__ACTION_VERSION__` define, then `'unknown'`.
 - Never log or commit credentials, access tokens, PMAKs, cassette request bodies, or raw captures.
 - Safe HTTP reads MUST use the repo-sync superset predicate: transport failures, 408, 429, every 5xx, and recognized timeout/downstream body markers. Unsafe mutations MUST opt in before retry or fallback resend.
 - Cassette replay is fail-closed on unknown keys and exhausted queues. Only fixtures with `repeatLast: true` may repeat final response.

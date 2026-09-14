@@ -12,6 +12,7 @@ inlines it into the action's self-contained `dist/`.
 | --- | --- |
 | `@postman-cs/automation-core` | HTTP errors, retry helpers/predicates, gateway client, logging, context, secrets resolver, telemetry |
 | `@postman-cs/automation-core/cassette` | dev/test-only fail-closed record/replay transport with query/body matching and response-header replay |
+| `@postman-cs/automation-core/route-manifest` | fail-closed static route extraction and manifest validation shared by the suite (`extractRoutesFromSource`, `validateRouteManifest`, `normalizePath`, `stripComments`) |
 
 ## What it sends
 
@@ -22,6 +23,7 @@ clear, no personal data:
 | Field | Since | Notes |
 | --- | --- | --- |
 | `schema_version` | v1 | wire contract version (currently 3) |
+| `event` | v1 | always `completion` |
 | `action`, `action_version`, `outcome`, `ts` | v1 | which action ran and how it finished |
 | `team_id` | v1 | Postman team id, sent clear (legitimate-interest basis) |
 | `ci_provider` | v1 | detected CI system (11 named + other/unknown) |
@@ -50,9 +52,7 @@ telemetry.setAccountType(sessionIdentity?.consumerType); // service/user/unknown
 telemetry.emitCompletion('success');
 ```
 
-`action_version` resolves from the consuming action's esbuild
-`--define:__ACTION_VERSION__` automatically (override via the `actionVersion`
-option). Opt out with `POSTMAN_ACTIONS_TELEMETRY=off` or `DO_NOT_TRACK=1`.
+`action_version` uses the explicit `actionVersion` option when supplied. Otherwise it resolves from `GITHUB_ACTION_REF`, then the bundled `__ACTION_VERSION__` define, then `'unknown'`. Opt out with `POSTMAN_ACTIONS_TELEMETRY=off` (also `0`/`false`/`no`) or a non-empty `DO_NOT_TRACK` value other than `0`/`false`; values are trimmed and case-insensitive.
 Corporate proxies are honored via `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY`.
 
 ### HTTP foundations
@@ -99,3 +99,5 @@ npm run lint
 npm run build    # tsc -> dist (JS + .d.ts)
 npm run verify:package
 ```
+
+Releases follow `RELEASE_POLICY.md`: immutable `v*` tags and GitHub Releases are authoritative, the version bump lives only on the tag, and npm publication is OIDC-only. Read the current version from `git tag --list 'v*'` or the npm registry, never from `main`'s `package.json`. Actions pin the published version in their `package.json` and esbuild-inline it into their self-contained `dist/`.
